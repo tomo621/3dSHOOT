@@ -11,9 +11,16 @@ public class ClickToWorldPosition : MonoBehaviour
     public GameObject hitEffectPrefab;
     public GameObject damagePopupPrefab;
     public AttackRangeShower rangeShower;
+    public AttackRangeShower2 attackRangeShower;
+    public int attackRange = 1;
 
     void Update()
     {
+        if (GameManager.Instance != null && !GameManager.Instance.IsPlayerTurn())
+        {
+            return;
+        }
+
         if (Input.GetMouseButtonDown(0))
         {
             Ray ray = Camera.main.ScreenPointToRay(Input.mousePosition);
@@ -23,6 +30,21 @@ public class ClickToWorldPosition : MonoBehaviour
             {
                 if (hit.collider.CompareTag("Enemy"))
                 {
+                    int unitGridX = Mathf.FloorToInt((unit.transform.position.x - gridOrigin.x) / cellSize);
+                    int unitGridZ = Mathf.FloorToInt((unit.transform.position.z - gridOrigin.z) / cellSize);
+
+                    int enemyGridX = Mathf.FloorToInt((hit.collider.transform.position.x - gridOrigin.x) / cellSize);
+                    int enemyGridZ = Mathf.FloorToInt((hit.collider.transform.position.z - gridOrigin.z) / cellSize);
+
+                    int diffX = Mathf.Abs(unitGridX - enemyGridX);
+                    int diffZ = Mathf.Abs(unitGridZ - enemyGridZ);
+
+                    if (diffX > attackRange || diffZ > attackRange)
+                    {
+                        Debug.Log("too far");
+                        return;
+                    }
+
                     EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
                     if (enemyHealth != null)
                     {
@@ -42,6 +64,11 @@ public class ClickToWorldPosition : MonoBehaviour
                         Instantiate(hitEffectPrefab, hit.collider.transform.position, Quaternion.identity);
                     }
 
+                    if (GameManager.Instance != null)
+                    {
+                        GameManager.Instance.EndPlayerTurn();
+                    }
+
                     return;
                 }
 
@@ -56,11 +83,9 @@ public class ClickToWorldPosition : MonoBehaviour
                     return;
                 }
 
-                Vector3 destination = new Vector3(
-                    gridOrigin.x + gridX * cellSize + cellSize / 2f,
-                    0.5f,
-                    gridOrigin.z + gridZ * cellSize + cellSize / 2f
-                );
+                float destX = gridOrigin.x + gridX * cellSize + cellSize / 2f;
+                float destZ = gridOrigin.z + gridZ * cellSize + cellSize / 2f;
+                Vector3 destination = new Vector3(destX, 0.5f, destZ);
 
                 if (unit != null)
                 {
@@ -71,26 +96,34 @@ public class ClickToWorldPosition : MonoBehaviour
                 {
                     rangeShower.ShowRange(destination);
                 }
+
+                if (attackRangeShower != null)
+                {
+                    attackRangeShower.ShowAttackRange(destination);
+                }
+
+                bool enemyInRange = false;
+                GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+                foreach (GameObject enemy in enemies)
+                {
+                    int enemyGridX2 = Mathf.FloorToInt((enemy.transform.position.x - gridOrigin.x) / cellSize);
+                    int enemyGridZ2 = Mathf.FloorToInt((enemy.transform.position.z - gridOrigin.z) / cellSize);
+
+                    int diffX2 = Mathf.Abs(gridX - enemyGridX2);
+                    int diffZ2 = Mathf.Abs(gridZ - enemyGridZ2);
+
+                    if (diffX2 <= attackRange && diffZ2 <= attackRange)
+                    {
+                        enemyInRange = true;
+                        break;
+                    }
+                }
+
+                if (!enemyInRange && GameManager.Instance != null)
+                {
+                    GameManager.Instance.EndPlayerTurn();
+                }
             }
-        }
-    }
-
-    void OnDrawGizmos()
-    {
-        Gizmos.color = Color.white;
-
-        for (int x = 0; x <= gridWidth; x++)
-        {
-            Vector3 start = gridOrigin + new Vector3(x * cellSize, 0, 0);
-            Vector3 end = gridOrigin + new Vector3(x * cellSize, 0, gridHeight * cellSize);
-            Gizmos.DrawLine(start, end);
-        }
-
-        for (int z = 0; z <= gridHeight; z++)
-        {
-            Vector3 start2 = gridOrigin + new Vector3(0, 0, z * cellSize);
-            Vector3 end2 = gridOrigin + new Vector3(gridWidth * cellSize, 0, z * cellSize);
-            Gizmos.DrawLine(start2, end2);
         }
     }
 }
