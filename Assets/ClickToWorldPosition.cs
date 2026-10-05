@@ -7,11 +7,10 @@ public class ClickToWorldPosition : MonoBehaviour
     public int gridHeight = 10;
     public Vector3 gridOrigin = new Vector3(-5f, 0f, -5f);
 
-    // CubeをInspectorからセットする
     public UnitController unit;
-
-    // 攻撃エフェクトのPrefabをInspectorからセットする
     public GameObject hitEffectPrefab;
+    public GameObject damagePopupPrefab;
+    public AttackRangeShower rangeShower;
 
     void Update()
     {
@@ -22,29 +21,40 @@ public class ClickToWorldPosition : MonoBehaviour
 
             if (Physics.Raycast(ray, out hit))
             {
-                // 敵をクリックした場合 → 攻撃処理
                 if (hit.collider.CompareTag("Enemy"))
                 {
                     EnemyHealth enemyHealth = hit.collider.GetComponent<EnemyHealth>();
                     if (enemyHealth != null)
                     {
-                        enemyHealth.TakeDamage(20);
+                        int damage = 20;
+                        enemyHealth.TakeDamage(damage);
+
+                        if (damagePopupPrefab != null)
+                        {
+                            Vector3 popupPos = hit.collider.transform.position + Vector3.up * 1.5f;
+                            GameObject popup = Instantiate(damagePopupPrefab, popupPos, Quaternion.identity);
+                            popup.GetComponent<DamagePopup>().Setup(damage);
+                        }
                     }
 
-                    // 攻撃エフェクトを敵の位置に出す
                     if (hitEffectPrefab != null)
                     {
                         Instantiate(hitEffectPrefab, hit.collider.transform.position, Quaternion.identity);
                     }
 
-                    return; // 移動処理はしない
+                    return;
                 }
 
-                // それ以外(地面)をクリックした場合 → 移動処理
                 Vector3 clickPosition = hit.point;
 
                 int gridX = Mathf.FloorToInt((clickPosition.x - gridOrigin.x) / cellSize);
                 int gridZ = Mathf.FloorToInt((clickPosition.z - gridOrigin.z) / cellSize);
+
+                if (rangeShower != null && rangeShower.HasActiveRange() && !rangeShower.IsValidCell(gridX, gridZ))
+                {
+                    Debug.Log("range NG");
+                    return;
+                }
 
                 Vector3 destination = new Vector3(
                     gridOrigin.x + gridX * cellSize + cellSize / 2f,
@@ -52,11 +62,14 @@ public class ClickToWorldPosition : MonoBehaviour
                     gridOrigin.z + gridZ * cellSize + cellSize / 2f
                 );
 
-                Debug.Log("移動先マス: (" + gridX + ", " + gridZ + ")  ワールド座標: " + destination);
-
                 if (unit != null)
                 {
                     unit.MoveTo(destination);
+                }
+
+                if (rangeShower != null)
+                {
+                    rangeShower.ShowRange(destination);
                 }
             }
         }
@@ -75,9 +88,9 @@ public class ClickToWorldPosition : MonoBehaviour
 
         for (int z = 0; z <= gridHeight; z++)
         {
-            Vector3 start = gridOrigin + new Vector3(0, 0, z * cellSize);
-            Vector3 end = gridOrigin + new Vector3(gridWidth * cellSize, 0, z * cellSize);
-            Gizmos.DrawLine(start, end);
+            Vector3 start2 = gridOrigin + new Vector3(0, 0, z * cellSize);
+            Vector3 end2 = gridOrigin + new Vector3(gridWidth * cellSize, 0, z * cellSize);
+            Gizmos.DrawLine(start2, end2);
         }
     }
 }
